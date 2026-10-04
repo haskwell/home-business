@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1791091668112,
-      "tag": "0000_tranquil_mongu",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1791091815304,
-      "tag": "0001_happy_quicksilver",
+      "when": 1791106731466,
+      "tag": "0000_broken_lake",
       "breakpoints": true
     }
   ]
