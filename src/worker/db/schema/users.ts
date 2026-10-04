@@ -5,7 +5,7 @@ import { businesses } from "./businesses";
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  password: text("password").notNull(),
+  passwordHash: text("passwordHash").notNull(),
   number: text("number").notNull(),
   email: text("email").notNull().unique(),
   businessId: integer("business_id").references(() => businesses.id),

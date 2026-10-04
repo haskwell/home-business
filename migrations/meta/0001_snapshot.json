@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9be0b32a-5b73-4584-a362-0cb731c483f3",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "fa60dc98-7465-4ffd-b73b-c13657c99a2b",
+  "prevId": "9be0b32a-5b73-4584-a362-0cb731c483f3",
   "tables": {
     "business_contacts": {
       "name": "business_contacts",
@@ -229,8 +229,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "password": {
-          "name": "password",
+        "passwordHash": {
+          "name": "passwordHash",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -731,7 +731,9 @@
   "_meta": {
     "schemas": {},
     "tables": {},
-    "columns": {}
+    "columns": {
+      "\"users\".\"password\"": "\"users\".\"passwordHash\""
+    }
   },
   "internal": {
     "indexes": {}

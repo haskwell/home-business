@@ -39,12 +39,12 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
    */
   // "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
-
   "d1_databases": [
     {
-      "binding": "DB",
-      "database_name": "test-db",
-      "migrations_dir": "migrations"
+      "binding": "home_business_dev",
+      "database_name": "home-business-dev",
+      "database_id": "89a4d84d-e71d-43c9-b371-6591559ced6a",
+      "remote": true
     }
   ]
 }
