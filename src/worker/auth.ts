@@ -15,10 +15,30 @@ export function createAuth(env: Env, db: DrizzleD1Database<typeof schema>) {
         businessId: { type: "number", required: false, input: false },
       },
     },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (userData) => {
+            const [created] = await db
+              .insert(businesses)
+              .values({ name: `${userData.name}'s Business` })
+              .returning();
+
+            return {
+              data: {
+                ...userData,
+                businessId: created.id,
+              },
+            };
+          },
+        },
+      },
+    },
   });
 }
 
 import { drizzle } from "drizzle-orm/d1";
+import { businesses } from "./db/schema";
 
 export function getAuth(env: Env) {
   const db = drizzle(env.DB, { schema });
