@@ -1,5 +1,7 @@
+import { ApiResponse } from "../../lib/response";
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { validationHook } from "../../lib/response";
 import { z } from "zod";
 import { requireAuth, type AppEnv } from "../../middleware/requireAuth";
 import {
@@ -41,12 +43,12 @@ function parseId(raw: string) {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-orders.get("/", zValidator("query", listQuery), async (c) => {
+orders.get("/", zValidator("query", listQuery, validationHook), async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked" }, 403);
 
   const rows = await listOrders(c.env, businessId, c.req.valid("query"));
-  return c.json({
+  return ApiResponse.fromLegacy(c, {
     orders: rows.map((o) => ({
       ...o,
       trackingUrl: trackingUrl(c, o.trackingLink),
@@ -56,25 +58,25 @@ orders.get("/", zValidator("query", listQuery), async (c) => {
 
 orders.get("/:id", async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked" }, 403);
 
   const id = parseId(c.req.param("id"));
-  if (!id) return c.json({ error: "Order not found" }, 404);
+  if (!id) return ApiResponse.fromLegacy(c, { error: "Order not found" }, 404);
 
   const order = await getOrderDetail(c.env, businessId, id);
-  if (!order) return c.json({ error: "Order not found" }, 404);
+  if (!order) return ApiResponse.fromLegacy(c, { error: "Order not found" }, 404);
 
-  return c.json({
+  return ApiResponse.fromLegacy(c, {
     order: { ...order, trackingUrl: trackingUrl(c, order.trackingLink) },
   });
 });
 
-orders.patch("/:id", zValidator("json", patchBody), async (c) => {
+orders.patch("/:id", zValidator("json", patchBody, validationHook), async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked" }, 403);
 
   const id = parseId(c.req.param("id"));
-  if (!id) return c.json({ error: "Order not found" }, 404);
+  if (!id) return ApiResponse.fromLegacy(c, { error: "Order not found" }, 404);
 
   const body = c.req.valid("json");
   const { expectedDeliveryTime, ...rest } = body;
@@ -86,9 +88,9 @@ orders.patch("/:id", zValidator("json", patchBody), async (c) => {
         expectedDeliveryTime === null ? null : new Date(expectedDeliveryTime),
     }),
   });
-  if (!order) return c.json({ error: "Order not found" }, 404);
+  if (!order) return ApiResponse.fromLegacy(c, { error: "Order not found" }, 404);
 
-  return c.json({
+  return ApiResponse.fromLegacy(c, {
     order: { ...order, trackingUrl: trackingUrl(c, order.trackingLink) },
   });
 });
@@ -96,15 +98,15 @@ orders.patch("/:id", zValidator("json", patchBody), async (c) => {
 // Creates the tracking link if the order doesn't have one; otherwise returns the existing one.
 orders.post("/:id/tracking-link", async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked" }, 403);
 
   const id = parseId(c.req.param("id"));
-  if (!id) return c.json({ error: "Order not found" }, 404);
+  if (!id) return ApiResponse.fromLegacy(c, { error: "Order not found" }, 404);
 
   const token = await ensureTrackingToken(c.env, businessId, id);
-  if (!token) return c.json({ error: "Order not found" }, 404);
+  if (!token) return ApiResponse.fromLegacy(c, { error: "Order not found" }, 404);
 
-  return c.json({ trackingUrl: trackingUrl(c, token) });
+  return ApiResponse.fromLegacy(c, { trackingUrl: trackingUrl(c, token) });
 });
 
 export default orders;

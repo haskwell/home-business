@@ -1,6 +1,8 @@
+import { ApiResponse } from "../../lib/response";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import { validationHook } from "../../lib/response";
 import { requireAuth, type AppEnv } from "../../middleware/requireAuth";
 import { getDB } from "../../db/client";
 import { isValidBusinessSlug } from "../../lib/slug";
@@ -38,10 +40,10 @@ const patchSchema = z
 const business = new Hono<AppEnv>();
 business.use("*", requireAuth);
 
-business.post("/", zValidator("json", createSchema), async (c) => {
+business.post("/", zValidator("json", createSchema, validationHook), async (c) => {
   const currentUser = c.get("user");
   if (currentUser.businessId) {
-    return c.json({ error: "This account already has a business" }, 409);
+    return ApiResponse.fromLegacy(c, { error: "This account already has a business" }, 409);
   }
 
   const input = c.req.valid("json");
@@ -53,13 +55,13 @@ business.post("/", zValidator("json", createSchema), async (c) => {
       ownerContact: input.ownerContact ?? currentUser.number,
     });
     if (!created) {
-      return c.json({ error: "This account already has a business" }, 409);
+      return ApiResponse.fromLegacy(c, { error: "This account already has a business" }, 409);
     }
-    return c.json({ business: created }, 201);
+    return ApiResponse.fromLegacy(c, { business: created }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/unique constraint/i.test(message)) {
-      return c.json({ error: "Business slug is already taken" }, 409);
+      return ApiResponse.fromLegacy(c, { error: "Business slug is already taken" }, 409);
     }
     throw error;
   }
@@ -67,40 +69,40 @@ business.post("/", zValidator("json", createSchema), async (c) => {
 
 business.get("/", async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "Business not found" }, 404);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
   const ownBusiness = await getOwnedBusiness(getDB(c.env), businessId);
-  if (!ownBusiness) return c.json({ error: "Business not found" }, 404);
-  return c.json({ business: ownBusiness });
+  if (!ownBusiness) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
+  return ApiResponse.fromLegacy(c, { business: ownBusiness });
 });
 
 business.get("/slug-available", async (c) => {
   const query = z.object({ slug }).safeParse({ slug: c.req.query("slug") });
-  if (!query.success) return c.json({ error: "Invalid or reserved business slug" }, 400);
+  if (!query.success) return ApiResponse.fromLegacy(c, { error: "Invalid or reserved business slug" }, 400);
   const available = await isBusinessSlugAvailable(getDB(c.env), query.data.slug);
-  return c.json({ available });
+  return ApiResponse.fromLegacy(c, { available });
 });
 
-business.patch("/", zValidator("json", patchSchema), async (c) => {
+business.patch("/", zValidator("json", patchSchema, validationHook), async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "Business not found" }, 404);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
   const input = c.req.valid("json");
   const db = getDB(c.env);
 
   if (input.businessLink) {
     const existing = await getBusinessBySlug(db, input.businessLink);
     if (existing && existing.id !== businessId) {
-      return c.json({ error: "Business slug is already taken" }, 409);
+      return ApiResponse.fromLegacy(c, { error: "Business slug is already taken" }, 409);
     }
   }
 
   try {
     const updated = await updateOwnedBusiness(db, businessId, input);
-    if (!updated) return c.json({ error: "Business not found" }, 404);
-    return c.json({ business: updated });
+    if (!updated) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
+    return ApiResponse.fromLegacy(c, { business: updated });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/unique constraint/i.test(message)) {
-      return c.json({ error: "Business slug is already taken" }, 409);
+      return ApiResponse.fromLegacy(c, { error: "Business slug is already taken" }, 409);
     }
     throw error;
   }

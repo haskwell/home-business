@@ -1,3 +1,4 @@
+import { ApiResponse } from "../../lib/response";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Context } from "hono";
@@ -30,7 +31,7 @@ function newImageKey(prefix: string, extension: string) {
 
 function uploadError(c: Context<AppEnv>, error: unknown) {
   if (error instanceof ImageInputError) {
-    return c.json({ error: error.message }, error.status);
+    return ApiResponse.fromLegacy(c, { error: error.message }, error.status);
   }
   throw error;
 }
@@ -87,16 +88,16 @@ async function storeReplacement(
 
 uploads.post("/items/:itemId/image", async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked to this account" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked to this account" }, 403);
   const itemId = parseItemId(c.req.param("itemId"));
-  if (!itemId) return c.json({ error: "Invalid item id" }, 400);
+  if (!itemId) return ApiResponse.fromLegacy(c, { error: "Invalid item id" }, 400);
 
   const db = getDB(c.env);
   const [item] = await db
     .select({ image: items.image })
     .from(items)
     .where(and(eq(items.id, itemId), eq(items.businessId, businessId)));
-  if (!item) return c.json({ error: "Item not found" }, 404);
+  if (!item) return ApiResponse.fromLegacy(c, { error: "Item not found" }, 404);
 
   let image: Awaited<ReturnType<typeof readImageUpload>>;
   try {
@@ -115,43 +116,43 @@ uploads.post("/items/:itemId/image", async (c) => {
       .returning({ id: items.id });
     return !!updated;
   });
-  if (!saved) return c.json({ error: "Item not found" }, 404);
-  return c.json({ image: imageUrl(key) });
+  if (!saved) return ApiResponse.fromLegacy(c, { error: "Item not found" }, 404);
+  return ApiResponse.fromLegacy(c, { image: imageUrl(key) });
 });
 
 uploads.delete("/items/:itemId/image", async (c) => {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked to this account" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked to this account" }, 403);
   const itemId = parseItemId(c.req.param("itemId"));
-  if (!itemId) return c.json({ error: "Invalid item id" }, 400);
+  if (!itemId) return ApiResponse.fromLegacy(c, { error: "Invalid item id" }, 400);
 
   const db = getDB(c.env);
   const [item] = await db
     .select({ image: items.image })
     .from(items)
     .where(and(eq(items.id, itemId), eq(items.businessId, businessId)));
-  if (!item) return c.json({ error: "Item not found" }, 404);
+  if (!item) return ApiResponse.fromLegacy(c, { error: "Item not found" }, 404);
 
   const [updated] = await db
     .update(items)
     .set({ image: null })
     .where(and(eq(items.id, itemId), eq(items.businessId, businessId)))
     .returning({ id: items.id });
-  if (!updated) return c.json({ error: "Item not found" }, 404);
+  if (!updated) return ApiResponse.fromLegacy(c, { error: "Item not found" }, 404);
 
   await deleteOldImage(c, item.image, `businesses/${businessId}/items/${itemId}/`);
-  return c.json({ image: null });
+  return ApiResponse.fromLegacy(c, { image: null });
 });
 
 async function uploadBusinessImage(c: Context<AppEnv>, field: "logo" | "banner", maxBytes: number) {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked to this account" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked to this account" }, 403);
   const db = getDB(c.env);
   const [business] = await db
     .select({ image: field === "logo" ? businesses.logo : businesses.banner })
     .from(businesses)
     .where(eq(businesses.id, businessId));
-  if (!business) return c.json({ error: "Business not found" }, 404);
+  if (!business) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
 
   let image: Awaited<ReturnType<typeof readImageUpload>>;
   try {
@@ -178,19 +179,19 @@ async function uploadBusinessImage(c: Context<AppEnv>, field: "logo" | "banner",
       .returning({ id: businesses.id });
     return !!updated;
   });
-  if (!saved) return c.json({ error: "Business not found" }, 404);
-  return c.json({ image: imageUrl(key) });
+  if (!saved) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
+  return ApiResponse.fromLegacy(c, { image: imageUrl(key) });
 }
 
 async function deleteBusinessImage(c: Context<AppEnv>, field: "logo" | "banner") {
   const businessId = c.get("user").businessId;
-  if (!businessId) return c.json({ error: "No business linked to this account" }, 403);
+  if (!businessId) return ApiResponse.fromLegacy(c, { error: "No business linked to this account" }, 403);
   const db = getDB(c.env);
   const [business] = await db
     .select({ image: field === "logo" ? businesses.logo : businesses.banner })
     .from(businesses)
     .where(eq(businesses.id, businessId));
-  if (!business) return c.json({ error: "Business not found" }, 404);
+  if (!business) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
 
   let updated: { id: number } | undefined;
   if (field === "logo") {
@@ -206,10 +207,10 @@ async function deleteBusinessImage(c: Context<AppEnv>, field: "logo" | "banner")
       .where(eq(businesses.id, businessId))
       .returning({ id: businesses.id });
   }
-  if (!updated) return c.json({ error: "Business not found" }, 404);
+  if (!updated) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
 
   await deleteOldImage(c, business.image, `businesses/${businessId}/${field}/`);
-  return c.json({ image: null });
+  return ApiResponse.fromLegacy(c, { image: null });
 }
 
 uploads.post("/business/logo", (c) => uploadBusinessImage(c, "logo", LOGO_IMAGE_MAX));
@@ -224,7 +225,7 @@ uploads.post("/user/image", async (c) => {
     .select({ image: user.image })
     .from(user)
     .where(eq(user.id, userId));
-  if (!currentUser) return c.json({ error: "User not found" }, 404);
+  if (!currentUser) return ApiResponse.fromLegacy(c, { error: "User not found" }, 404);
 
   let image: Awaited<ReturnType<typeof readImageUpload>>;
   try {
@@ -243,8 +244,8 @@ uploads.post("/user/image", async (c) => {
       .returning({ id: user.id });
     return !!updated;
   });
-  if (!saved) return c.json({ error: "User not found" }, 404);
-  return c.json({ image: imageUrl(key) });
+  if (!saved) return ApiResponse.fromLegacy(c, { error: "User not found" }, 404);
+  return ApiResponse.fromLegacy(c, { image: imageUrl(key) });
 });
 
 uploads.delete("/user/image", async (c) => {
@@ -254,17 +255,17 @@ uploads.delete("/user/image", async (c) => {
     .select({ image: user.image })
     .from(user)
     .where(eq(user.id, userId));
-  if (!currentUser) return c.json({ error: "User not found" }, 404);
+  if (!currentUser) return ApiResponse.fromLegacy(c, { error: "User not found" }, 404);
 
   const [updated] = await db
     .update(user)
     .set({ image: null })
     .where(eq(user.id, userId))
     .returning({ id: user.id });
-  if (!updated) return c.json({ error: "User not found" }, 404);
+  if (!updated) return ApiResponse.fromLegacy(c, { error: "User not found" }, 404);
 
   await deleteOldImage(c, currentUser.image, `users/${userId}/avatar/`);
-  return c.json({ image: null });
+  return ApiResponse.fromLegacy(c, { image: null });
 });
 
 export default uploads;

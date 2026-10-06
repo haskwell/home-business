@@ -1,3 +1,4 @@
+import { ApiResponse } from "../../lib/response";
 import { Hono } from "hono";
 import { requireAuth, type AppEnv } from "../../middleware/requireAuth";
 import { getAllUsers } from "./service";
@@ -9,12 +10,12 @@ users.use("*", requireAuth);
 
 users.get("/", async (c) => {
   const allUsers = await getAllUsers(c.env);
-  return c.json({ users: allUsers });
+  return ApiResponse.fromLegacy(c, { users: allUsers });
 });
 
 users.get("/me", (c) => {
   const currentUser = c.get("user");
-  return c.json({ user: { ...currentUser, image: imageUrl(currentUser.image) } });
+  return ApiResponse.fromLegacy(c, { user: { ...currentUser, image: imageUrl(currentUser.image) } });
 });
 
 export default users;

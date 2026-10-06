@@ -1,5 +1,4 @@
 import { and, desc, eq } from "drizzle-orm";
-import { sql } from "drizzle-orm";
 import { getDB } from "../../db/client";
 import { businesses, customerOrders, items, orderItems } from "../../db/schema";
 import { imageUrl } from "../../lib/image";
@@ -123,25 +122,35 @@ export async function createGuestOrder(
   },
 ) {
   const db = getDB(env);
-  const [orderInsert] = await db.batch([
-    db.run(sql`INSERT INTO customer_orders
-      (business_id, customer_name, customer_phone, customer_note, address, status, price, payment_status, tracking_link)
-      VALUES (${input.businessId}, ${input.customerName}, ${input.customerPhone}, ${input.customerNote},
-        ${input.address}, 'pending', ${input.price}, 'unpaid', ${input.trackingLink})`),
-    db.run(sql`INSERT INTO order_items
-      (order_id, item_id, quantity, unit_price, total_price, extra_note)
-      SELECT
-        (SELECT id FROM customer_orders WHERE tracking_link = ${input.trackingLink}),
-        CAST(json_extract(entry.value, '$.itemId') AS INTEGER),
-        CAST(json_extract(entry.value, '$.quantity') AS INTEGER),
-        CAST(json_extract(entry.value, '$.unitPrice') AS INTEGER),
-        CAST(json_extract(entry.value, '$.totalPrice') AS INTEGER),
-        json_extract(entry.value, '$.extraNote')
-      FROM json_each(${JSON.stringify(input.items)}) AS entry`),
-  ]);
+  const [order] = await db
+    .insert(customerOrders)
+    .values({
+      businessId: input.businessId,
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      customerNote: input.customerNote,
+      address: input.address,
+      price: input.price,
+      trackingLink: input.trackingLink,
+    })
+    .returning({ id: customerOrders.id });
+  if (!order) throw new Error("Could not create order");
+
+  if (input.items.length) {
+    await db.insert(orderItems).values(
+      input.items.map((item) => ({
+        orderId: order.id,
+        itemId: item.itemId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        extraNote: item.extraNote,
+      })),
+    );
+  }
 
   return {
-    id: orderInsert.meta.last_row_id,
+    id: order.id,
     trackingLink: input.trackingLink,
     price: input.price,
   };

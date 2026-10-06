@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDB } from "../../db/client";
 import { businesses, businessContacts } from "../../db/schema";
 import { user } from "../../db/schema/auth-schema";
@@ -35,25 +35,33 @@ export async function createBusiness(
     ownerContact: string;
   },
 ) {
-  // INSERT ... SELECT makes the ownership check part of the same D1 batch as
-  // the user link, so concurrent signup completion cannot create an orphan.
-  const [insertResult] = await db.batch([
-    db.run(sql`INSERT INTO businesses (name, business_link, description, owner_contact)
-      SELECT ${input.name}, ${input.businessLink}, ${input.description ?? null}, ${input.ownerContact}
-      WHERE EXISTS (SELECT 1 FROM "user" WHERE id = ${input.userId} AND business_id IS NULL)`),
-    db.run(sql`UPDATE "user"
-      SET business_id = (SELECT id FROM businesses WHERE business_link = ${input.businessLink})
-      WHERE id = ${input.userId} AND business_id IS NULL
-        AND EXISTS (SELECT 1 FROM businesses WHERE business_link = ${input.businessLink})`),
-  ]);
-  if (!insertResult.meta.changes) return null;
-
   const [owner] = await db
     .select({ businessId: user.businessId })
     .from(user)
     .where(eq(user.id, input.userId));
-  if (!owner?.businessId) return null;
-  return getOwnedBusiness(db, owner.businessId);
+  if (!owner || owner.businessId !== null) return null;
+
+  const [business] = await db
+    .insert(businesses)
+    .values({
+      name: input.name,
+      businessLink: input.businessLink,
+      description: input.description ?? null,
+      ownerContact: input.ownerContact,
+    })
+    .returning({ id: businesses.id });
+  if (!business) return null;
+
+  const [linkedOwner] = await db
+    .update(user)
+    .set({ businessId: business.id })
+    .where(and(eq(user.id, input.userId), isNull(user.businessId)))
+    .returning({ businessId: user.businessId });
+  if (!linkedOwner) {
+    await db.delete(businesses).where(eq(businesses.id, business.id));
+    return null;
+  }
+  return getOwnedBusiness(db, business.id);
 }
 
 export async function getBusinessBySlug(db: DB, slug: string) {

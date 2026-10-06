@@ -1,5 +1,4 @@
-import { betterAuth } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import type { DrizzleD1Database } from "drizzle-orm/d1";

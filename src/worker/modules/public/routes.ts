@@ -1,7 +1,9 @@
+import { ApiResponse } from "../../lib/response";
 import { Hono } from "hono";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import { validationHook } from "../../lib/response";
 import { getDB } from "../../db/client";
 import { items } from "../../db/schema";
 import {
@@ -18,8 +20,8 @@ const publicRoutes = new Hono<{ Bindings: Env }>();
 
 publicRoutes.get("/businesses/:businessLink", async (c) => {
   const business = await getPublicBusiness(c.env, c.req.param("businessLink").toLowerCase());
-  if (!business) return c.json({ error: "Business not found" }, 404);
-  return c.json({ business });
+  if (!business) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
+  return ApiResponse.fromLegacy(c, { business });
 });
 
 publicRoutes.get("/businesses/:businessLink/menu", async (c) => {
@@ -27,10 +29,10 @@ publicRoutes.get("/businesses/:businessLink/menu", async (c) => {
     c.env,
     c.req.param("businessLink").toLowerCase(),
   );
-  if (!linkedBusiness) return c.json({ error: "Business not found" }, 404);
+  if (!linkedBusiness) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
   const menu = await getPublicMenu(c.env, linkedBusiness.id);
   c.header("Cache-Control", "public, max-age=60, s-maxage=60");
-  return c.json({ menu });
+  return ApiResponse.fromLegacy(c, { menu });
 });
 
 const guestOrderSchema = z.object({
@@ -45,14 +47,14 @@ const guestOrderSchema = z.object({
   })).min(1).max(50),
 });
 
-publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOrderSchema), async (c) => {
+publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOrderSchema, validationHook), async (c) => {
   const businessLink = c.req.param("businessLink").toLowerCase();
   const business = await findPublicBusinessForOrder(c.env, businessLink);
-  if (!business) return c.json({ error: "Business not found" }, 404);
+  if (!business) return ApiResponse.fromLegacy(c, { error: "Business not found" }, 404);
 
   const rawIdempotencyKey = c.req.header("Idempotency-Key")?.trim();
   if (rawIdempotencyKey && !/^[A-Za-z0-9._~-]{16,128}$/.test(rawIdempotencyKey)) {
-    return c.json({ error: "Invalid Idempotency-Key" }, 400);
+    return ApiResponse.fromLegacy(c, { error: "Invalid Idempotency-Key" }, 400);
   }
   const trackingToken = rawIdempotencyKey
     ? await trackingTokenForIdempotencyKey(
@@ -65,7 +67,7 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
   if (rawIdempotencyKey) {
     const existing = await getGuestOrderByTrackingLink(c.env, business.id, trackingToken);
     if (existing) {
-      return c.json({
+      return ApiResponse.fromLegacy(c, {
         order: existing,
         trackingToken,
         trackingUrl: `/track/${trackingToken}`,
@@ -74,7 +76,7 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
   }
 
   if (!business.isAcceptingOrders) {
-    return c.json({ error: "This business is not accepting orders" }, 409);
+    return ApiResponse.fromLegacy(c, { error: "This business is not accepting orders" }, 409);
   }
 
   const input = c.req.valid("json");
@@ -90,7 +92,7 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
     .filter(([, value]) => value.quantity > 99)
     .map(([itemId]) => itemId);
   if (invalidQuantityIds.length) {
-    return c.json({ error: "Combined item quantities cannot exceed 99", itemIds: invalidQuantityIds }, 400);
+    return ApiResponse.fromLegacy(c, { error: "Combined item quantities cannot exceed 99", itemIds: invalidQuantityIds }, 400);
   }
 
   const db = getDB(c.env);
@@ -111,7 +113,7 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
     return !item || !item.isListed || !item.inStock;
   });
   if (invalidItemIds.length) {
-    return c.json({
+    return ApiResponse.fromLegacy(c, {
       error: "Some items are unavailable",
       itemIds: invalidItemIds,
     }, 400);
@@ -124,10 +126,10 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
     const item = rowById.get(itemId)!;
     const totalPrice = item.price * selection.quantity;
     if (!Number.isSafeInteger(item.price) || !Number.isSafeInteger(totalPrice) || item.price < 0) {
-      return c.json({ error: "An item has an invalid price", itemIds: [itemId] }, 400);
+      return ApiResponse.fromLegacy(c, { error: "An item has an invalid price", itemIds: [itemId] }, 400);
     }
     orderPrice += totalPrice;
-    if (!Number.isSafeInteger(orderPrice)) return c.json({ error: "Order total is too large" }, 400);
+    if (!Number.isSafeInteger(orderPrice)) return ApiResponse.fromLegacy(c, { error: "Order total is too large" }, 400);
     const line = {
       itemId,
       quantity: selection.quantity,
@@ -155,7 +157,7 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
     if (rawIdempotencyKey && error instanceof Error && /unique constraint/i.test(error.message)) {
       const existing = await getGuestOrderByTrackingLink(c.env, business.id, trackingToken);
       if (existing) {
-        return c.json({
+        return ApiResponse.fromLegacy(c, {
           order: existing,
           trackingToken,
           trackingUrl: `/track/${trackingToken}`,
@@ -165,7 +167,7 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
     throw error;
   }
 
-  return c.json({
+  return ApiResponse.fromLegacy(c, {
     order: {
       id: order.id,
       status: "pending",
@@ -179,13 +181,23 @@ publicRoutes.post("/businesses/:businessLink/orders", zValidator("json", guestOr
 });
 
 publicRoutes.get("/images/*", async (c) => {
-  const key = c.req.param("*");
+  const pathname = new URL(c.req.url).pathname;
+  const imagePathPrefix = "/api/public/images/";
+  const rawKey = pathname.startsWith(imagePathPrefix)
+    ? pathname.slice(imagePathPrefix.length)
+    : "";
+  let key: string;
+  try {
+    key = rawKey.split("/").map(decodeURIComponent).join("/");
+  } catch {
+    key = "";
+  }
   if (!key || !isPublicImageKey(key)) {
-    return c.json({ error: "Image not found" }, 404);
+    return ApiResponse.fromLegacy(c, { error: "Invalid image key" }, 404);
   }
 
   const object = await c.env.BUCKET.get(key);
-  if (!object) return c.json({ error: "Image not found" }, 404);
+  if (!object) return ApiResponse.fromLegacy(c, { error: "Image not found" }, 404);
 
   const headers = new Headers({
     "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
@@ -210,14 +222,14 @@ publicRoutes.get("/track/:token", async (c) => {
 
   // Cheap shape check so junk never reaches the database.
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) {
-    return c.json({ error: "Tracking link not found" }, 404);
+    return ApiResponse.fromLegacy(c, { error: "Tracking link not found" }, 404);
   }
 
   const order = await getTrackingInfo(c.env, token);
-  if (!order) return c.json({ error: "Tracking link not found" }, 404);
+  if (!order) return ApiResponse.fromLegacy(c, { error: "Tracking link not found" }, 404);
 
   c.header("Cache-Control", "no-store");
-  return c.json({ order });
+  return ApiResponse.fromLegacy(c, { order });
 });
 
 export default publicRoutes;

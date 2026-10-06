@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+.field { @apply min-w-0 rounded border border-slate-300 bg-white px-3 py-2; }
+.button { @apply rounded bg-slate-900 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50; }
+.link { @apply text-blue-700 underline; }
+.card { @apply my-3 rounded border border-slate-200 bg-white p-4; }
+.title { @apply mb-4 text-2xl font-bold; }
+.subtitle { @apply mb-3 text-lg font-semibold; }

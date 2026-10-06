@@ -6,6 +6,7 @@ import orders from "./modules/orders/routes";
 import publicRoutes from "./modules/public/routes";
 import business from "./modules/business/routes";
 import uploads from "./modules/uploads/routes";
+import { ApiResponse } from "./lib/response";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -20,5 +21,11 @@ app.route("/api/uploads", uploads);
 app.route("/api/menu", menu);
 app.route("/api/orders", orders);
 app.route("/api/public", publicRoutes);
+
+app.notFound((c) => ApiResponse.notFound("Route not found").toResponse(c));
+app.onError((error, c) => {
+  console.error("Unhandled worker error", error);
+  return ApiResponse.fail(500, "Internal server error", "INTERNAL_ERROR").toResponse(c);
+});
 
 export default app;

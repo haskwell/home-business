@@ -1,7 +1,9 @@
+import { ApiResponse } from "../../lib/response";
 import { Hono } from "hono";
 import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import { validationHook } from "../../lib/response";
 import { requireAuth, type AppEnv } from "../../middleware/requireAuth";
 import { getDB } from "../../db/client";
 import { categories, items } from "../../db/schema";
@@ -30,7 +32,7 @@ const menu = new Hono<AppEnv>();
 
 menu.use("*", requireAuth, async (c, next) => {
   if (!c.get("user").businessId) {
-    return c.json({ error: "No business linked to this account" }, 403);
+    return ApiResponse.fromLegacy(c, { error: "No business linked to this account" }, 403);
   }
   await next();
 });
@@ -82,34 +84,34 @@ menu.get("/items", async (c) => {
     .from(items)
     .where(eq(items.businessId, c.get("user").businessId!))
     .orderBy(desc(items.priority), asc(items.id));
-  return c.json({ items: rows.map((item) => ({ ...item, image: imageUrl(item.image) })) });
+  return ApiResponse.fromLegacy(c, { items: rows.map((item) => ({ ...item, image: imageUrl(item.image) })) });
 });
 
 // CREATE
-menu.post("/items", zValidator("json", createItemSchema), async (c) => {
+menu.post("/items", zValidator("json", createItemSchema, validationHook), async (c) => {
   const businessId = c.get("user").businessId!;
   const input = c.req.valid("json");
   const db = getDB(c.env);
 
   if (input.categoryId && !(await categoryBelongsToBusiness(db, input.categoryId, businessId))) {
-    return c.json({ error: "Category not found" }, 400);
+    return ApiResponse.fromLegacy(c, { error: "Category not found" }, 400);
   }
 
   const [item] = await db.insert(items).values({ ...input, businessId }).returning();
-  return c.json({ item: { ...item, image: imageUrl(item.image) } }, 201);
+  return ApiResponse.fromLegacy(c, { item: { ...item, image: imageUrl(item.image) } }, 201);
 });
 
 // EDIT
-menu.patch("/items/:id", zValidator("json", updateItemSchema), async (c) => {
+menu.patch("/items/:id", zValidator("json", updateItemSchema, validationHook), async (c) => {
   const id = parseId(c.req.param("id"));
-  if (!id) return c.json({ error: "Invalid id" }, 400);
+  if (!id) return ApiResponse.fromLegacy(c, { error: "Invalid id" }, 400);
 
   const businessId = c.get("user").businessId!;
   const input = c.req.valid("json");
   const db = getDB(c.env);
 
   if (input.categoryId && !(await categoryBelongsToBusiness(db, input.categoryId, businessId))) {
-    return c.json({ error: "Category not found" }, 400);
+    return ApiResponse.fromLegacy(c, { error: "Category not found" }, 400);
   }
 
   const [item] = await db
@@ -118,14 +120,14 @@ menu.patch("/items/:id", zValidator("json", updateItemSchema), async (c) => {
     .where(and(eq(items.id, id), eq(items.businessId, businessId)))
     .returning();
 
-  if (!item) return c.json({ error: "Item not found" }, 404);
-  return c.json({ item: { ...item, image: imageUrl(item.image) } });
+  if (!item) return ApiResponse.fromLegacy(c, { error: "Item not found" }, 404);
+  return ApiResponse.fromLegacy(c, { item: { ...item, image: imageUrl(item.image) } });
 });
 
 // UNLIST
 menu.patch("/items/:id/unlist", async (c) => {
   const id = parseId(c.req.param("id"));
-  if (!id) return c.json({ error: "Invalid id" }, 400);
+  if (!id) return ApiResponse.fromLegacy(c, { error: "Invalid id" }, 400);
 
   const db = getDB(c.env);
   const [item] = await db
@@ -134,8 +136,8 @@ menu.patch("/items/:id/unlist", async (c) => {
     .where(and(eq(items.id, id), eq(items.businessId, c.get("user").businessId!)))
     .returning();
 
-  if (!item) return c.json({ error: "Item not found" }, 404);
-  return c.json({ item: { ...item, image: imageUrl(item.image) } });
+  if (!item) return ApiResponse.fromLegacy(c, { error: "Item not found" }, 404);
+  return ApiResponse.fromLegacy(c, { item: { ...item, image: imageUrl(item.image) } });
 });
 
 // LIST CATEGORIES
@@ -146,34 +148,34 @@ menu.get("/categories", async (c) => {
     .from(categories)
     .where(eq(categories.businessId, c.get("user").businessId!))
     .orderBy(asc(categories.name));
-  return c.json({ categories: rows });
+  return ApiResponse.fromLegacy(c, { categories: rows });
 });
 
 // CREATE CATEGORY
-menu.post("/categories", zValidator("json", categorySchema), async (c) => {
+menu.post("/categories", zValidator("json", categorySchema, validationHook), async (c) => {
   const businessId = c.get("user").businessId!;
   const { name } = c.req.valid("json");
   const db = getDB(c.env);
 
   if (await categoryNameTaken(db, businessId, name)) {
-    return c.json({ error: "Category name already exists" }, 409);
+    return ApiResponse.fromLegacy(c, { error: "Category name already exists" }, 409);
   }
 
   const [category] = await db.insert(categories).values({ name, businessId }).returning();
-  return c.json({ category }, 201);
+  return ApiResponse.fromLegacy(c, { category }, 201);
 });
 
 // EDIT CATEGORY (rename)
-menu.patch("/categories/:id", zValidator("json", categorySchema), async (c) => {
+menu.patch("/categories/:id", zValidator("json", categorySchema, validationHook), async (c) => {
   const id = parseId(c.req.param("id"));
-  if (!id) return c.json({ error: "Invalid id" }, 400);
+  if (!id) return ApiResponse.fromLegacy(c, { error: "Invalid id" }, 400);
 
   const businessId = c.get("user").businessId!;
   const { name } = c.req.valid("json");
   const db = getDB(c.env);
 
   if (await categoryNameTaken(db, businessId, name, id)) {
-    return c.json({ error: "Category name already exists" }, 409);
+    return ApiResponse.fromLegacy(c, { error: "Category name already exists" }, 409);
   }
 
   const [category] = await db
@@ -182,8 +184,8 @@ menu.patch("/categories/:id", zValidator("json", categorySchema), async (c) => {
     .where(and(eq(categories.id, id), eq(categories.businessId, businessId)))
     .returning();
 
-  if (!category) return c.json({ error: "Category not found" }, 404);
-  return c.json({ category });
+  if (!category) return ApiResponse.fromLegacy(c, { error: "Category not found" }, 404);
+  return ApiResponse.fromLegacy(c, { category });
 });
 
 // REMOVE CATEGORY
@@ -191,13 +193,13 @@ menu.patch("/categories/:id", zValidator("json", categorySchema), async (c) => {
 // Both steps run in one db.batch so it is all-or-nothing.
 menu.delete("/categories/:id", async (c) => {
   const id = parseId(c.req.param("id"));
-  if (!id) return c.json({ error: "Invalid id" }, 400);
+  if (!id) return ApiResponse.fromLegacy(c, { error: "Invalid id" }, 400);
 
   const businessId = c.get("user").businessId!;
   const db = getDB(c.env);
 
   if (!(await categoryBelongsToBusiness(db, id, businessId))) {
-    return c.json({ error: "Category not found" }, 404);
+    return ApiResponse.fromLegacy(c, { error: "Category not found" }, 404);
   }
 
   const [uncategorized, deleted] = await db.batch([
@@ -212,7 +214,7 @@ menu.delete("/categories/:id", async (c) => {
       .returning(),
   ]);
 
-  return c.json({ category: deleted[0], itemsUncategorized: uncategorized.length });
+  return ApiResponse.fromLegacy(c, { category: deleted[0], itemsUncategorized: uncategorized.length });
 });
 
 export default menu;
