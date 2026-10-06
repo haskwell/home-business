@@ -53,7 +53,8 @@
     "db:migrate:local": "wrangler d1 migrations apply test-db --local",
     "db:migrate:cloud": "npx wrangler d1 migrations apply home-business-dev --remote",
     "db:update:local": "npm run db:generate && npm run db:migrate:local",
-    "db:update:cloud": "npm run db:generate && npm run db:migrate:cloud"
+    "db:update:cloud": "npm run db:generate && npm run db:migrate:cloud",
+    "db:seed:cloud": "npx wrangler d1 execute home-business-dev --remote --file=./seed/seed.sql"
   },
   "type": "module"
 }
