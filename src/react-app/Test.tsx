@@ -22,7 +22,11 @@ export default function Test() {
   const [loading, setLoading] = useState(false);
   const [responseLog, setResponseLog] = useState<ResponseLog | null>(null);
 
-  const executeRequest = async (label: string, url: string, options?: RequestInit) => {
+  const executeRequest = async (
+    label: string,
+    url: string,
+    options?: RequestInit,
+  ) => {
     setLoading(true);
     try {
       const res = await fetch(url, {
@@ -315,7 +319,8 @@ export default function Test() {
               </div>
             ) : (
               <div className="p-8 text-center text-sm text-gray-400 border border-dashed rounded bg-gray-50">
-                No requests made yet. Submit a form or click an action button to see raw server response.
+                No requests made yet. Submit a form or click an action button to
+                see raw server response.
               </div>
             )}
           </div>
