@@ -1,4 +1,4 @@
-import { integer, text, sqliteTable } from "drizzle-orm/sqlite-core";
+import { integer, text, index, sqliteTable } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { businesses } from "./businesses";
 
@@ -8,7 +8,7 @@ export const categories = sqliteTable("categories", {
   businessId: integer("business_id")
     .notNull()
     .references(() => businesses.id),
-});
+}, (table) => [index("categories_business_id_idx").on(table.businessId)]);
 
 export const items = sqliteTable("items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -32,4 +32,4 @@ export const items = sqliteTable("items", {
     .default(sql`(unixepoch())`)
     .$onUpdate(() => new Date()),
   priority: integer("priority").notNull().default(0),
-});
+}, (table) => [index("items_business_id_idx").on(table.businessId)]);

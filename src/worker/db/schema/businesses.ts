@@ -11,8 +11,11 @@ export const businesses = sqliteTable("businesses", {
   instagram: text("instagram"),
   tiktok: text("tiktok"),
   facebook: text("facebook"),
-  businessLink: text("business_link"),
+  businessLink: text("business_link").notNull().unique(),
   ownerContact: text("owner_contact"),
+  isAcceptingOrders: integer("is_accepting_orders", { mode: "boolean" })
+    .notNull()
+    .default(true),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

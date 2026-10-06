@@ -8,6 +8,20 @@
       "when": 1791106731466,
       "tag": "0000_broken_lake",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791277644798,
+      "tag": "0001_mixed_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791278688641,
+      "tag": "0002_condemned_reaper",
+      "breakpoints": true
     }
   ]
 }

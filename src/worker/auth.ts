@@ -1,5 +1,7 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { drizzle } from "drizzle-orm/d1";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "./db/schema/auth-schema";
 
@@ -17,28 +19,20 @@ export function createAuth(env: Env, db: DrizzleD1Database<typeof schema>) {
     },
     databaseHooks: {
       user: {
-        create: {
+        update: {
           before: async (userData) => {
-            const [created] = await db
-              .insert(businesses)
-              .values({ name: `${userData.name}'s Business` })
-              .returning();
-
-            return {
-              data: {
-                ...userData,
-                businessId: created.id,
-              },
-            };
+            if (Object.hasOwn(userData, "image")) {
+              throw new APIError("BAD_REQUEST", {
+                message: "Profile images must be changed through the upload endpoint",
+              });
+            }
+            return { data: userData };
           },
         },
       },
     },
   });
 }
-
-import { drizzle } from "drizzle-orm/d1";
-import { businesses } from "./db/schema";
 
 export function getAuth(env: Env) {
   const db = drizzle(env.DB, { schema });

@@ -1,11 +1,12 @@
 import { asc } from "drizzle-orm";
 import { getDB } from "../../db/client";
 import { user } from "../../db/schema/auth-schema";
+import { imageUrl } from "../../lib/image";
 
 export async function getAllUsers(env: Env) {
   const db = getDB(env);
 
-  return db
+  const rows = await db
     .select({
       id: user.id,
       name: user.name,
@@ -17,4 +18,5 @@ export async function getAllUsers(env: Env) {
     })
     .from(user)
     .orderBy(asc(user.createdAt));
+  return rows.map((row) => ({ ...row, image: imageUrl(row.image) }));
 }

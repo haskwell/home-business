@@ -1,7 +1,6 @@
-import { integer, text, sqliteTable } from "drizzle-orm/sqlite-core";
+import { integer, text, index, sqliteTable } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { businesses } from "./businesses";
-import { customers } from "./customers";
 import { items } from "./menu";
 
 export const customerOrders = sqliteTable("customer_orders", {
@@ -9,10 +8,10 @@ export const customerOrders = sqliteTable("customer_orders", {
   businessId: integer("business_id")
     .notNull()
     .references(() => businesses.id),
-  customerId: integer("customer_id")
-    .notNull()
-    .references(() => customers.id),
-  status: text("status", { enum: ["pending", "delivered"] })
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  customerNote: text("customer_note"),
+  status: text("status", { enum: ["pending", "delivered", "cancelled"] })
     .notNull()
     .default("pending"),
   price: integer("price").notNull().default(0),
@@ -24,7 +23,7 @@ export const customerOrders = sqliteTable("customer_orders", {
   expectedDeliveryTime: integer("expected_delivery_time", {
     mode: "timestamp",
   }),
-  trackingLink: text("tracking_link"),
+  trackingLink: text("tracking_link").notNull().unique(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -32,7 +31,7 @@ export const customerOrders = sqliteTable("customer_orders", {
     .notNull()
     .default(sql`(unixepoch())`)
     .$onUpdate(() => new Date()),
-});
+}, (table) => [index("customer_orders_business_id_idx").on(table.businessId)]);
 
 export const orderItems = sqliteTable("order_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -46,4 +45,4 @@ export const orderItems = sqliteTable("order_items", {
   unitPrice: integer("unit_price").notNull(),
   totalPrice: integer("total_price").notNull(),
   extraNote: text("extra_note"),
-});
+}, (table) => [index("order_items_order_id_idx").on(table.orderId)]);

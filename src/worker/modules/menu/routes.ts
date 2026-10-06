@@ -5,20 +5,21 @@ import { zValidator } from "@hono/zod-validator";
 import { requireAuth, type AppEnv } from "../../middleware/requireAuth";
 import { getDB } from "../../db/client";
 import { categories, items } from "../../db/schema";
+import { imageUrl } from "../../lib/image";
 
 const createItemSchema = z.object({
   name: z.string().trim().min(1).max(100),
   description: z.string().max(1000).optional(),
   price: z.number().int().nonnegative(), // smallest unit, e.g. 2500 = 25.00
   categoryId: z.number().int().positive().optional(),
-  image: z.string().optional(),
   inStock: z.boolean().optional(),
   priority: z.number().int().optional(),
-});
+}).strict();
 
 const updateItemSchema = createItemSchema
   .partial()
   .extend({ categoryId: z.number().int().positive().nullable().optional() })
+  .strict()
   .refine((d) => Object.keys(d).length > 0, "Send at least one field");
 
 const categorySchema = z.object({
@@ -81,7 +82,7 @@ menu.get("/items", async (c) => {
     .from(items)
     .where(eq(items.businessId, c.get("user").businessId!))
     .orderBy(desc(items.priority), asc(items.id));
-  return c.json({ items: rows });
+  return c.json({ items: rows.map((item) => ({ ...item, image: imageUrl(item.image) })) });
 });
 
 // CREATE
@@ -95,7 +96,7 @@ menu.post("/items", zValidator("json", createItemSchema), async (c) => {
   }
 
   const [item] = await db.insert(items).values({ ...input, businessId }).returning();
-  return c.json({ item }, 201);
+  return c.json({ item: { ...item, image: imageUrl(item.image) } }, 201);
 });
 
 // EDIT
@@ -118,7 +119,7 @@ menu.patch("/items/:id", zValidator("json", updateItemSchema), async (c) => {
     .returning();
 
   if (!item) return c.json({ error: "Item not found" }, 404);
-  return c.json({ item });
+  return c.json({ item: { ...item, image: imageUrl(item.image) } });
 });
 
 // UNLIST
@@ -134,7 +135,7 @@ menu.patch("/items/:id/unlist", async (c) => {
     .returning();
 
   if (!item) return c.json({ error: "Item not found" }, 404);
-  return c.json({ item });
+  return c.json({ item: { ...item, image: imageUrl(item.image) } });
 });
 
 // LIST CATEGORIES
