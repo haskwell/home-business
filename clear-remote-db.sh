@@ -10,14 +10,13 @@ cat >"$SQL_FILE" <<'SQL'
 -- Child tables first so this works with foreign-key enforcement enabled.
 DELETE FROM order_items;
 DELETE FROM customer_orders;
+DELETE FROM items;
+DELETE FROM categories;
+DELETE FROM business_contacts;
 DELETE FROM session;
 DELETE FROM account;
 DELETE FROM verification;
-DELETE FROM business_contacts;
-DELETE FROM items;
-DELETE FROM categories;
 DELETE FROM user;
-DELETE FROM customers;
 DELETE FROM businesses;
 
 -- Reset generated integer IDs for tables that use AUTOINCREMENT.
